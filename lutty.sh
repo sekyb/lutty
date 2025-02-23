@@ -1,26 +1,88 @@
 #!/bin/bash
 
+# Logo
+clear
+cat Logo.txt 
+
+# Adding Sleep delay to make logo visable
+sleep 1.2
+
 # Configuration file for storing profiles
 CONFIG_FILE="$HOME/.lutty_profiles"
 
 # Ensure config file exists
 touch "$CONFIG_FILE"
 
+# Function to get terminal size
+get_term_size() {
+    rows=$(tput lines)
+    cols=$(tput cols)
+}
+
+# Function to center text
+center_text() {
+    local text="$1"
+    local width=${#text}
+    local padding=$(( (cols - width) / 2 ))
+    printf "%*s%s%*s\n" "$padding" "" "$text" "$padding" ""
+}
+
+# Function to draw a menu box dynamically
+draw_menu() {
+    get_term_size
+    clear
+    local box_width=40
+    local box_height=10
+    local start_col=$(( (cols - box_width) / 2 ))
+    local start_row=$(( (rows - box_height) / 2 ))
+
+    tput cup "$start_row" "$start_col"; echo "╔══════════════════════════════╗"
+    tput cup $((start_row + 1)) "$start_col"; echo "║          LUTTY               ║"
+    tput cup $((start_row + 2)) "$start_col"; echo "║      PuTTY for Linux         ║"
+    tput cup $((start_row + 3)) "$start_col"; echo "╠══════════════════════════════╣"
+    tput cup $((start_row + 4)) "$start_col"; echo "║ 1) List Profiles             ║"
+    tput cup $((start_row + 5)) "$start_col"; echo "║ 2) Add Profile               ║"
+    tput cup $((start_row + 6)) "$start_col"; echo "║ 3) Remove Profile            ║"
+    tput cup $((start_row + 7)) "$start_col"; echo "║ 4) Connect to Profile        ║"
+    tput cup $((start_row + 8)) "$start_col"; echo "║ 5) Exit                      ║"
+    tput cup $((start_row + 9)) "$start_col"; echo "╚══════════════════════════════╝"
+
+    tput cup $((start_row + 11)) "$start_col"
+    printf "Enter your choice: "
+}
+
 # Function to list saved profiles
 list_profiles() {
+    clear
+    get_term_size  # Get terminal size dynamically
+    local start_row=3  # Start listing profiles from row 3
+
+    center_text "Saved Profiles"
     echo ""
+
+    # Check if there are no profiles
     if [[ ! -s "$CONFIG_FILE" ]]; then
-        echo "No saved profiles found."
-        echo ""
+        center_text "No saved profiles found."
+        sleep 1
         return
     fi
-    echo "Saved Profiles:"
-    awk -F ',' '{print NR ") " $1 " (" $2 ")"}' "$CONFIG_FILE"
+
+    # Read and display profiles from the configuration file
+    local count=0
+    while IFS=',' read -r profile_name username host port; do
+        count=$((count + 1))
+        tput cup $((start_row + count)) 5  # Move to the next line dynamically
+        echo "$count) $profile_name ($username@$host:$port)"
+    done < "$CONFIG_FILE"
+
     echo ""
+    sleep 1
 }
 
 # Function to add a new profile
 add_profile() {
+    clear
+    center_text "Add New Profile"
     echo ""
     echo "Enter profile name:"
     read -r profile_name
@@ -34,31 +96,37 @@ add_profile() {
     
     echo "$profile_name,$username,$host,$port" >> "$CONFIG_FILE"
     echo "Profile '$profile_name' added!"
-    echo ""
+    sleep 1
 }
 
 # Function to remove a profile
 remove_profile() {
-    echo ""
+    clear
     list_profiles
     echo "Enter the profile number to delete:"
     read -r profile_num
     sed -i "${profile_num}d" "$CONFIG_FILE"
     echo "Profile removed!"
-    echo ""
+    sleep 1
 }
 
 # Function to connect via SSH using a saved profile
 connect_profile() {
-    echo ""
+    clear
     list_profiles
-    echo "Enter the profile number to connect:"
+    echo "Enter the profile number to connect, or 'e' to exit to main menu:"
     read -r profile_num
+
+    # Check if user wants to exit to the main menu
+    if [[ "$profile_num" == "e" ]]; then
+        return
+    fi
+
     profile=$(sed -n "${profile_num}p" "$CONFIG_FILE")
     
     if [[ -z "$profile" ]]; then
         echo "Invalid profile number!"
-        echo ""
+        sleep 1
         return
     fi
     
@@ -76,34 +144,21 @@ connect_profile() {
 
     echo ""
     echo "Connecting to $profile_name ($host)..."
-    echo ""
+    sleep 1
     ssh -p "$port" $log_option "$username@$host"
-    echo ""
 }
 
 # Menu system
 while true; do
-    echo ""
-    echo "==============================="
-    echo "           LUTTY               "
-    echo "       PuTTY for Linux"
-    echo "==============================="
-    echo "1) List Profiles"
-    echo "2) Add Profile"
-    echo "3) Remove Profile"
-    echo "4) Connect to Profile"
-    echo "5) Exit"
-    echo "==============================="
-    echo "Enter your choice:"
+    draw_menu
     read -r choice
-    echo ""
 
     case $choice in
         1) list_profiles ;;
         2) add_profile ;;
         3) remove_profile ;;
         4) connect_profile ;;
-        5) echo "Goodbye!"; echo ""; exit 0 ;;
-        *) echo "Invalid choice, please try again."; echo "" ;;
+        5) clear; echo "Goodbye!"; exit 0 ;;
+        *) clear; echo "Invalid choice, please try again."; sleep 1 ;;
     esac
 done
